@@ -243,6 +243,12 @@ Chạy với mock environment:
 npm run test:mock
 ```
 
+Trước khi chạy local environment, cài Python dependencies nếu chưa có:
+
+```bash
+pip install -r requirements.txt
+```
+
 Chạy với local environment:
 
 ```bash
