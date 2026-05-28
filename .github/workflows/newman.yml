@@ -69,7 +69,7 @@ jobs:
         if: matrix.env == 'local'
         run: |
           sleep 5
-          npx wait-on http://127.0.0.1:8000/health http://localhost:4011/health --timeout 30000
+          npx wait-on http://127.0.0.1:8000/health http://localhost:4011/detect --timeout 30000
 
       # --- CHẠY NEWMAN TEST ---
       - name: Run Newman contract tests
