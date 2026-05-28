@@ -9,8 +9,8 @@
     "mock:all": "sh -c 'npm run mock:iot & npm run mock:vision & wait'",
     "lint:contracts": "spectral lint contracts/*.yaml --fail-severity error",
     "test:mock": "node scripts/run-mocks-and-newman.js",
-    "test:local": "newman run postman/collections/FIT4110_lab03_iot_ingestion.postman_collection.json -e postman/environments/FIT4110_lab03_local.postman_environment.json --env-var baseUrl=http://localhost:8000 --reporters cli,junit --reporter-junit-export reports/newman-report-local.xml",
-    "test:html": "newman run postman/collections/FIT4110_lab03_iot_ingestion.postman_collection.json -e postman/environments/FIT4110_lab03_mock.postman_environment.json --env-var baseUrl=http://localhost:4010 --reporters cli,htmlextra --reporter-htmlextra-export reports/newman-report.html",
+    "test:local": "node scripts/run-newman-local.js",
+    "test:html": "node scripts/run-newman-local.js",
     "test:ci": "npm run lint:contracts && npm run test:mock"
   },
   "devDependencies": {
