@@ -1,213 +1,127 @@
 openapi: 3.1.0
 info:
-  title: Smart Campus — IoT Ingestion API
-  version: 0.3.0
+  title: Smart Campus — IoT Ingestion
+  version: 1.0.0
   description: |
-    Contract mẫu dùng cho FIT4110 Lab 03 — Postman, Mock Server và Contract Testing.
-    Sinh viên có thể thay thế file này bằng openapi.yaml của service nhóm mình từ Lab 02.
+    Contract for the IoT ingestion service used in FIT4110 Lab 03.
+    This file is the source of truth for the Postman mock server and the Newman test collection.
+  contact:
+    name: Smart Campus Team
+    email: lab@smartcampus.local
 servers:
   - url: http://localhost:4010
-    description: Prism mock server
-  - url: http://localhost:8000
-    description: Local development server
+    description: Local Prism mock server
+  - url: https://api.campus.local
+    description: Production placeholder
 tags:
+  - name: health
+    description: Health check endpoints
   - name: readings
-    description: Sensor telemetry ingestion
-  - name: system
-    description: Health and runtime information
+    description: IoT reading ingestion endpoints
 security:
   - bearerAuth: []
 paths:
   /health:
     get:
-      tags: [system]
       operationId: getHealth
-      summary: Kiểm tra trạng thái service
-      description: Public health check dùng để kiểm tra mock/service đã sẵn sàng.
+      summary: Service health check
+      description: Returns a lightweight health payload so consumers can verify mock/server availability.
+      tags: [health]
       security: []
       responses:
-        "200":
-          description: Service đang hoạt động
+        '200':
+          description: Service is running
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthResponse"
+                $ref: '#/components/schemas/HealthStatus'
               examples:
                 ok:
                   value:
                     status: ok
                     service: iot-ingestion
-                    version: 0.3.0
+                    time: '2026-05-28T08:00:00Z'
 
   /readings:
     post:
-      tags: [readings]
       operationId: createReading
-      summary: Gửi một bản ghi cảm biến từ thiết bị IoT
-      description: |
-        Endpoint nhận telemetry từ ESP32 hoặc gateway.
-        Request phải có device_id, metric, value và timestamp.
-        Trong lab này, ví dụ boundary dùng nhiệt độ hợp lệ từ -40 đến 80.
-        Các nhóm có thể điều chỉnh miền giá trị theo service thật của mình.
+      summary: Create a new sensor reading
+      description: Accepts a new IoT device reading and returns a confirmation payload.
+      tags: [readings]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SensorReadingCreate"
+              $ref: '#/components/schemas/CreateReadingRequest'
             examples:
-              valid_temperature:
+              temperatureReading:
                 value:
                   device_id: ESP32-LAB-A01
                   metric: temperature
                   value: 31.5
                   unit: celsius
-                  timestamp: "2026-05-13T08:30:00+07:00"
-              boundary_high_temperature:
-                value:
-                  device_id: ESP32-LAB-A01
-                  metric: temperature
-                  value: 80
-                  unit: celsius
-                  timestamp: "2026-05-13T08:30:00+07:00"
+                  timestamp: '2026-05-13T08:30:00+07:00'
       responses:
-        "201":
-          description: Đã ghi nhận bản đọc cảm biến
+        '201':
+          description: Reading created successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SensorReadingCreated"
+                $ref: '#/components/schemas/ReadingCreated'
               examples:
                 created:
                   value:
-                    reading_id: R-20260513-0001
+                    reading_id: 0196fb3d-4ad7-7d1e-9f49-5d5148d2babc
                     device_id: ESP32-LAB-A01
                     metric: temperature
+                    unit: celsius
+                    value: 31.5
+                    timestamp: '2026-05-13T08:30:00+07:00'
                     accepted: true
-                    created_at: "2026-05-13T08:30:01+07:00"
-        "400":
-          description: Request không hợp lệ
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
-              examples:
-                missing_device:
-                  value:
-                    type: https://smart-campus.local/problems/validation-error
-                    title: Validation error
-                    status: 400
-                    detail: device_id is required
-                    instance: /readings
-                value_out_of_range:
-                  value:
-                    type: https://smart-campus.local/problems/value-out-of-range
-                    title: Value out of range
-                    status: 400
-                    detail: temperature must be between -40 and 80
-                    instance: /readings
-        "401":
-          description: Thiếu hoặc sai token
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
-              examples:
-                unauthorized:
-                  value:
-                    type: https://smart-campus.local/problems/unauthorized
-                    title: Unauthorized
-                    status: 401
-                    detail: Missing or invalid bearer token
-                    instance: /readings
-        "429":
-          description: Thiết bị gửi dữ liệu quá nhiều trong thời gian ngắn
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
-              examples:
-                rate_limited:
-                  value:
-                    type: https://smart-campus.local/problems/rate-limited
-                    title: Too Many Requests
-                    status: 429
-                    detail: Device exceeded allowed telemetry rate
-                    instance: /readings
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
   /readings/latest:
     get:
-      tags: [readings]
       operationId: getLatestReadings
-      summary: Lấy các bản ghi cảm biến mới nhất
-      description: Trả về danh sách bản ghi mới nhất, có thể lọc theo thiết bị và giới hạn số dòng.
+      summary: List latest readings
+      description: Returns the most recent readings, optionally filtered by device_id and limited in size.
+      tags: [readings]
       parameters:
-        - in: query
-          name: device_id
-          required: false
-          schema:
-            type: string
-          example: ESP32-LAB-A01
-        - in: query
-          name: limit
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
-          example: 5
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: '#/components/parameters/Limit'
       responses:
-        "200":
-          description: Danh sách bản ghi mới nhất
+        '200':
+          description: Latest readings page
           content:
             application/json:
               schema:
-                type: object
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/SensorReading"
+                $ref: '#/components/schemas/ReadingPage'
               examples:
-                latest:
+                latestReadings:
                   value:
                     items:
-                      - reading_id: R-20260513-0001
+                      - reading_id: 0196fb3d-4ad7-7d1e-9f49-5d5148d2babc
                         device_id: ESP32-LAB-A01
                         metric: temperature
-                        value: 31.5
                         unit: celsius
-                        timestamp: "2026-05-13T08:30:00+07:00"
-        "400":
-          description: Query parameter không hợp lệ
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
-              examples:
-                invalid_limit:
-                  value:
-                    type: https://smart-campus.local/problems/validation-error
-                    title: Validation error
-                    status: 400
-                    detail: limit must be between 1 and 100
-                    instance: /readings/latest
-        "401":
-          description: Thiếu hoặc sai token
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetails"
-              examples:
-                unauthorized:
-                  value:
-                    type: https://smart-campus.local/problems/unauthorized
-                    title: Unauthorized
-                    status: 401
-                    detail: Missing or invalid bearer token
-                    instance: /readings/latest
+                        value: 31.5
+                        timestamp: '2026-05-13T08:30:00+07:00'
+                        accepted: true
+                    hasMore: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   securitySchemes:
@@ -217,71 +131,9 @@ components:
       bearerFormat: JWT
 
   schemas:
-    SensorMetric:
-      type: string
-      enum: [temperature, humidity, motion, smoke]
-
-    SensorReadingCreate:
+    HealthStatus:
       type: object
-      required: [device_id, metric, value, timestamp]
-      properties:
-        device_id:
-          type: string
-          minLength: 3
-          example: ESP32-LAB-A01
-        metric:
-          $ref: "#/components/schemas/SensorMetric"
-        value:
-          type: number
-          minimum: -40
-          maximum: 80
-          description: |
-            Giá trị mẫu dùng cho boundary test trong Lab 03.
-            Với metric=temperature, miền hợp lệ minh họa là -40 đến 80.
-            Các nhóm cần thay đổi min/max cho đúng nghiệp vụ của service mình.
-          example: 31.5
-        unit:
-          type: string
-          enum: [celsius, percent, boolean, ppm]
-          example: celsius
-        timestamp:
-          type: string
-          format: date-time
-          example: "2026-05-13T08:30:00+07:00"
-
-    SensorReading:
-      allOf:
-        - $ref: "#/components/schemas/SensorReadingCreate"
-        - type: object
-          required: [reading_id]
-          properties:
-            reading_id:
-              type: string
-              example: R-20260513-0001
-
-    SensorReadingCreated:
-      type: object
-      required: [reading_id, device_id, metric, accepted, created_at]
-      properties:
-        reading_id:
-          type: string
-          example: R-20260513-0001
-        device_id:
-          type: string
-          example: ESP32-LAB-A01
-        metric:
-          $ref: "#/components/schemas/SensorMetric"
-        accepted:
-          type: boolean
-          example: true
-        created_at:
-          type: string
-          format: date-time
-          example: "2026-05-13T08:30:01+07:00"
-
-    HealthResponse:
-      type: object
-      required: [status, service, version]
+      required: [status, service, time]
       properties:
         status:
           type: string
@@ -290,9 +142,78 @@ components:
         service:
           type: string
           example: iot-ingestion
-        version:
+        time:
           type: string
-          example: 0.3.0
+          format: date-time
+          example: '2026-05-28T08:00:00Z'
+
+    CreateReadingRequest:
+      type: object
+      required: [device_id, metric, value, unit, timestamp]
+      properties:
+        device_id:
+          type: string
+          example: ESP32-LAB-A01
+        metric:
+          type: string
+          enum: [temperature, humidity, pressure]
+          example: temperature
+        value:
+          type: number
+          minimum: -40
+          maximum: 80
+          example: 31.5
+        unit:
+          type: string
+          enum: [celsius, percent, pascal]
+          example: celsius
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-05-13T08:30:00+07:00'
+
+    ReadingCreated:
+      type: object
+      required: [reading_id, device_id, metric, unit, value, timestamp, accepted]
+      properties:
+        reading_id:
+          type: string
+          format: uuid
+          example: 0196fb3d-4ad7-7d1e-9f49-5d5148d2babc
+        device_id:
+          type: string
+          example: ESP32-LAB-A01
+        metric:
+          type: string
+          enum: [temperature, humidity, pressure]
+          example: temperature
+        unit:
+          type: string
+          enum: [celsius, percent, pascal]
+          example: celsius
+        value:
+          type: number
+          example: 31.5
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-05-13T08:30:00+07:00'
+        accepted:
+          type: boolean
+          example: true
+
+    ReadingPage:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReadingCreated'
+        nextCursor:
+          type: string
+        hasMore:
+          type: boolean
 
     ProblemDetails:
       type: object
@@ -301,7 +222,7 @@ components:
         type:
           type: string
           format: uri
-        title:
+        title:                                                                
           type: string
         status:
           type: integer
@@ -311,3 +232,80 @@ components:
           type: string
         instance:
           type: string
+
+  parameters:
+    DeviceId:
+      name: device_id
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Filter readings by device id.
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Maximum number of readings to return.
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            missingField:
+              value:
+                type: https://smart-campus.local/problems/bad-request
+                title: Bad Request
+                status: 400
+                detail: Thiếu trường bắt buộc
+                instance: /readings
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            invalidToken:
+              value:
+                type: https://smart-campus.local/problems/unauthorized
+                title: Unauthorized
+                status: 401
+                detail: Missing or invalid bearer token
+                instance: /readings
+    UnprocessableEntity:
+      description: Request payload schema violation
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            invalidMetric:
+              value:
+                type: https://smart-campus.local/problems/unprocessable-entity
+                title: Unprocessable Entity
+                status: 422
+                detail: metric must be one of [temperature, humidity, pressure]
+                instance: /readings
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            internalError:
+              value:
+                type: https://smart-campus.local/problems/internal-server-error
+                title: Internal Server Error
+                status: 500
+                detail: Unexpected error
+                instance: /readings
