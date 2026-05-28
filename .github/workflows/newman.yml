@@ -50,7 +50,7 @@ jobs:
 
       - name: Wait for mock servers
         if: matrix.env == 'mock'
-        run: npx wait-on http://localhost:4010/health http://localhost:4011/health --timeout 30000
+        run: npx wait-on http-get://localhost:4010/health http-get://localhost:4011/health --timeout 30000
 
       # --- BẬT MOCK SERVER VISION CHO LOCAL ---
       - name: Start AI Vision Mock for Local environment
