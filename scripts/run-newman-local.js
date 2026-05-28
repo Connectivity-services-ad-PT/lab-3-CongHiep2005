@@ -1,12 +1,7 @@
 const { spawn } = require('child_process');
 
 const collections = [
-  'postman/collections/01_Functional.postman_collection.json',
-  'postman/collections/02_Auth.postman_collection.json',
-  'postman/collections/03_Negative.postman_collection.json',
-  'postman/collections/04_Boundary_Reliability.postman_collection.json',
-  'postman/collections/05_Consumer_side_Smoke.postman_collection.json',
-  'postman/collections/06_Local_only_NonFunctional.postman_collection.json'
+  "postman/collections/FIT4110_lab03_iot_ingestion.postman_collection.json"
 ];
 
 const envFile = 'postman/environments/FIT4110_lab03_local.postman_environment.json';
