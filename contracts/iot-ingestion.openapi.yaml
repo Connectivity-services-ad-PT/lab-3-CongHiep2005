@@ -1,36 +1,36 @@
 openapi: 3.1.0
 info:
-  title: Smart Campus — IoT Ingestion
+  title: Smart Campus — IoT Ingestion to Core Business Event Contract
   version: 1.0.0
   description: |
-    Contract for the IoT ingestion service used in FIT4110 Lab 03.
-    This file is the source of truth for the Postman mock server and the Newman test collection.
+    Hợp đồng API cho IoT Ingestion (Consumer) gửi sensor telemetry events đến Core Business (Provider).
+    IoT Ingestion nhận dữ liệu từ các cảm biến (nhiệt độ, độ ẩm, khí gas, động chuyển) và định kỳ gửi đến Core Business.
   contact:
-    name: Smart Campus Team
-    email: lab@smartcampus.local
+    name: A1 Team
+    email: hoanp162@gmail.com
 servers:
   - url: http://localhost:4010
-    description: Local Prism mock server
+    description: Prism mock server
   - url: https://api.campus.local
-    description: Production placeholder
+    description: Class network placeholder
 tags:
   - name: health
-    description: Health check endpoints
-  - name: readings
-    description: IoT reading ingestion endpoints
+    description: Kiểm tra trạng thái service
+  - name: telemetry
+    description: Gửi dữ liệu telemetry từ IoT sensors
 security:
   - bearerAuth: []
 paths:
   /health:
     get:
       operationId: getHealth
-      summary: Service health check
-      description: Returns a lightweight health payload so consumers can verify mock/server availability.
+      summary: Kiểm tra trạng thái service
+      description: Endpoint kiểm tra service còn hoạt động.
       tags: [health]
       security: []
       responses:
         '200':
-          description: Service is running
+          description: Service đang hoạt động
           content:
             application/json:
               schema:
@@ -40,45 +40,53 @@ paths:
                   value:
                     status: ok
                     service: iot-ingestion
-                    time: '2026-05-28T08:00:00Z'
+                    time: '2026-05-10T08:00:00Z'
 
-  /readings:
+  /telemetry:
     post:
-      operationId: createReading
-      summary: Create a new sensor reading
-      description: Accepts a new IoT device reading and returns a confirmation payload.
-      tags: [readings]
+      operationId: submitTelemetry
+      summary: Gửi dữ liệu telemetry từ IoT sensors
+      description: |
+        IoT Ingestion gửi dữ liệu sensor telemetry đến Core Business.
+        Hỗ trợ nhiều loại sensor: nhiệt độ, độ ẩm, khí gas, động chuyển.
+      tags: [telemetry]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateReadingRequest'
+              $ref: '#/components/schemas/TelemetryBatch'
             examples:
-              temperatureReading:
+              mixedSensors:
                 value:
-                  device_id: ESP32-LAB-A01
-                  metric: temperature
-                  value: 31.5
-                  unit: celsius
-                  timestamp: '2026-05-13T08:30:00+07:00'
+                  timestamp: '2026-05-10T08:00:00Z'
+                  location: building-a-floor-3
+                  readings:
+                    - sensorId: TEMP-001
+                      sensorType: temperature
+                      value: 24.5
+                      unit: celsius
+                    - sensorId: HUM-001
+                      sensorType: humidity
+                      value: 65.0
+                      unit: percentage
+                    - sensorId: MOTION-001
+                      sensorType: motion
+                      value: 1
+                      unit: count
       responses:
-        '201':
-          description: Reading created successfully
+        '202':
+          description: Telemetry đã được nhận và xếp hàng xử lý
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReadingCreated'
+                $ref: '#/components/schemas/TelemetryAcknowledged'
               examples:
-                created:
+                accepted:
                   value:
-                    reading_id: 0196fb3d-4ad7-7d1e-9f49-5d5148d2babc
-                    device_id: ESP32-LAB-A01
-                    metric: temperature
-                    unit: celsius
-                    value: 31.5
-                    timestamp: '2026-05-13T08:30:00+07:00'
-                    accepted: true
+                    batchId: 0196fb3d-4ad7-7d1e-9f49-5d5148d2babc
+                    readingCount: 3
+                    receivedAt: '2026-05-10T08:00:01Z'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -88,40 +96,24 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /readings/latest:
-    get:
-      operationId: getLatestReadings
-      summary: List latest readings
-      description: Returns the most recent readings, optionally filtered by device_id and limited in size.
-      tags: [readings]
-      parameters:
-        - $ref: '#/components/parameters/DeviceId'
-        - $ref: '#/components/parameters/Limit'
+
+
+webhooks:
+  telemetryProcessed:
+    post:
+      operationId: onTelemetryProcessed
+      summary: Webhook khi telemetry đã xử lý xong
+      description: Core Business phát sự kiện sau khi đã xử lý và lưu telemetry data.
+      tags: [telemetry]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryProcessedEvent'
       responses:
         '200':
-          description: Latest readings page
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReadingPage'
-              examples:
-                latestReadings:
-                  value:
-                    items:
-                      - reading_id: 0196fb3d-4ad7-7d1e-9f49-5d5148d2babc
-                        device_id: ESP32-LAB-A01
-                        metric: temperature
-                        unit: celsius
-                        value: 31.5
-                        timestamp: '2026-05-13T08:30:00+07:00'
-                        accepted: true
-                    hasMore: false
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          description: IoT Ingestion đã nhận webhook
 
 components:
   securitySchemes:
@@ -130,182 +122,239 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  parameters: {}
+
   schemas:
     HealthStatus:
       type: object
+      additionalProperties: false
       required: [status, service, time]
       properties:
         status:
           type: string
           enum: [ok]
+          description: Trạng thái service.
           example: ok
         service:
           type: string
+          minLength: 2
+          maxLength: 80
+          description: Tên service.
           example: iot-ingestion
         time:
           type: string
           format: date-time
-          example: '2026-05-28T08:00:00Z'
+          description: Thời điểm kiểm tra.
+          example: '2026-05-10T08:00:00Z'
 
-    CreateReadingRequest:
+    SensorReading:
       type: object
-      required: [device_id, metric, value, unit, timestamp]
+      additionalProperties: false
+      required: [sensorId, sensorType, value, unit]
       properties:
-        device_id:
+        sensorId:
           type: string
-          example: ESP32-LAB-A01
-        metric:
+          minLength: 3
+          maxLength: 50
+          pattern: '^[A-Z0-9-]+$'
+          description: Mã định danh cảm biến.
+          example: TEMP-001
+        sensorType:
           type: string
-          enum: [temperature, humidity, pressure]
+          enum: [temperature, humidity, gas, motion]
+          description: Loại cảm biến.
           example: temperature
         value:
           type: number
-          minimum: -40
-          maximum: 80
-          example: 31.5
+          description: Giá trị đo được.
+          example: 24.5
         unit:
           type: string
-          enum: [celsius, percent, pascal]
+          minLength: 1
+          maxLength: 20
+          description: Đơn vị đo.
           example: celsius
+        status:
+          type: string
+          enum: [ok, error, offline]
+          description: Trạng thái cảm biến.
+          example: ok
+
+    TelemetryBatch:
+      type: object
+      additionalProperties: false
+      required: [timestamp, location, readings]
+      properties:
         timestamp:
           type: string
           format: date-time
-          example: '2026-05-13T08:30:00+07:00'
+          description: Thời điểm tạo batch telemetry.
+          example: '2026-05-10T08:00:00Z'
+        location:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: Vị trí vật lý nơi thu thập dữ liệu.
+          example: building-a-floor-3
+        readings:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/SensorReading'
+          description: Danh sách dữ liệu sensor.
 
-    ReadingCreated:
+    TelemetryAcknowledged:
       type: object
-      required: [reading_id, device_id, metric, unit, value, timestamp, accepted]
+      additionalProperties: false
+      required: [batchId, readingCount, receivedAt]
       properties:
-        reading_id:
+        batchId:
           type: string
           format: uuid
+          description: UUID duy nhất cho batch telemetry này.
           example: 0196fb3d-4ad7-7d1e-9f49-5d5148d2babc
-        device_id:
-          type: string
-          example: ESP32-LAB-A01
-        metric:
-          type: string
-          enum: [temperature, humidity, pressure]
-          example: temperature
-        unit:
-          type: string
-          enum: [celsius, percent, pascal]
-          example: celsius
-        value:
-          type: number
-          example: 31.5
-        timestamp:
+        readingCount:
+          type: integer
+          minimum: 1
+          description: Số lượng sensor readings nhận được.
+          example: 3
+        receivedAt:
           type: string
           format: date-time
-          example: '2026-05-13T08:30:00+07:00'
-        accepted:
-          type: boolean
-          example: true
+          description: Thời điểm Core Business nhận dữ liệu.
+          example: '2026-05-10T08:00:01Z'
 
-    ReadingPage:
+    TelemetryProcessedEvent:
       type: object
-      required: [items, hasMore]
+      additionalProperties: false
+      required: [batchId, status, processedAt]
       properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ReadingCreated'
-        nextCursor:
+        batchId:
           type: string
-        hasMore:
-          type: boolean
+          format: uuid
+          description: UUID của batch telemetry đã xử lý.
+          example: 0196fb3d-4ad7-7d1e-9f49-5d5148d2babc
+        status:
+          type: string
+          enum: [success, partial_error, failed]
+          description: Trạng thái xử lý batch.
+          example: success
+        processedAt:
+          type: string
+          format: date-time
+          description: Thời điểm hoàn tất xử lý.
+          example: '2026-05-10T08:00:05Z'
+        errorCount:
+          type: integer
+          minimum: 0
+          description: Số lượng sensor readings lỗi.
+          example: 0
 
-    ProblemDetails:
+
+    Problem:
       type: object
-      required: [type, title, status, detail]
+      additionalProperties: false
+      required: [type, title, status]
       properties:
         type:
           type: string
           format: uri
-        title:                                                                
+          description: URI định danh loại lỗi.
+          example: https://campus.local/errors/validation
+        title:
           type: string
+          minLength: 3
+          maxLength: 120
+          description: Tiêu đề lỗi ngắn gọn.
+          example: Dữ liệu không hợp lệ
         status:
           type: integer
           minimum: 400
           maximum: 599
+          description: HTTP status code.
+          example: 400
         detail:
-          type: string
+          oneOf:
+            - type: string
+            - type: 'null'
+          maxLength: 500
+          description: Mô tả chi tiết lỗi.
+          example: Field cardId không đúng định dạng
         instance:
-          type: string
-
-  parameters:
-    DeviceId:
-      name: device_id
-      in: query
-      required: false
-      schema:
-        type: string
-      description: Filter readings by device id.
-    Limit:
-      name: limit
-      in: query
-      required: false
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 20
-      description: Maximum number of readings to return.
+          oneOf:
+            - type: string
+            - type: 'null'
+          format: uri
+          description: URI của request gây lỗi.
+          example: https://campus.local/alerts
+        errors:
+          type: array
+          minItems: 0
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [field, code, message]
+            properties:
+              field:
+                type: string
+                minLength: 1
+                maxLength: 80
+                example: cardId
+              code:
+                type: string
+                minLength: 2
+                maxLength: 80
+                example: PATTERN_MISMATCH
+              message:
+                type: string
+                minLength: 3
+                maxLength: 200
+                example: cardId phải có dạng RFID-YYYY-NNN
 
   responses:
     BadRequest:
-      description: Bad request
+      description: Dữ liệu sai định dạng
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ProblemDetails'
-          examples:
-            missingField:
-              value:
-                type: https://smart-campus.local/problems/bad-request
-                title: Bad Request
-                status: 400
-                detail: Thiếu trường bắt buộc
-                instance: /readings
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/validation
+            title: Dữ liệu không hợp lệ
+            status: 400
+            detail: Payload không đúng JSON Schema
+            instance: https://campus.local/telemetry
+            errors:
+              - field: sensorType
+                code: ENUM_MISMATCH
+                message: sensorType phải là temperature, humidity, gas, hoặc motion
+
     Unauthorized:
-      description: Missing or invalid authentication
+      description: Thiếu hoặc sai thông tin xác thực
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ProblemDetails'
-          examples:
-            invalidToken:
-              value:
-                type: https://smart-campus.local/problems/unauthorized
-                title: Unauthorized
-                status: 401
-                detail: Missing or invalid bearer token
-                instance: /readings
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://campus.local/errors/unauthorized
+            title: Chưa xác thực
+            status: 401
+            detail: Thiếu Bearer token
+            instance: https://campus.local/telemetry
+            errors: []
+
     UnprocessableEntity:
-      description: Request payload schema violation
+      description: Payload đúng định dạng nhưng không hợp lệ về nghiệp vụ
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ProblemDetails'
-          examples:
-            invalidMetric:
-              value:
-                type: https://smart-campus.local/problems/unprocessable-entity
-                title: Unprocessable Entity
-                status: 422
-                detail: metric must be one of [temperature, humidity, pressure]
-                instance: /readings
+            $ref: '#/components/schemas/Problem'
+
     InternalServerError:
-      description: Internal server error
+      description: Lỗi không mong muốn phía server
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ProblemDetails'
-          examples:
-            internalError:
-              value:
-                type: https://smart-campus.local/problems/internal-server-error
-                title: Internal Server Error
-                status: 500
-                detail: Unexpected error
-                instance: /readings
+            $ref: '#/components/schemas/Problem'

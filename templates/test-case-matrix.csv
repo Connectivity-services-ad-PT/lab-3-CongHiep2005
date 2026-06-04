@@ -1,6 +1,9 @@
 ID,Folder,Endpoint,Method,Scenario,Input file/body,Expected status,Expected response check,Type,Pass/Fail,Evidence
-TC01,Functional,/health,GET,Service is alive,-,200,status=ok,functional,,
-TC02,Functional,/readings,POST,Create reading happy path,mock-data/sensor-reading-valid.json,201,"has reading_id, accepted=true",functional,,
-TC03,Negative,/readings,POST,Missing device_id,mock-data/sensor-reading-invalid-missing-device.json,400,Problem Details,negative,,
-TC04,Auth,/readings,POST,Missing token,mock-data/sensor-reading-valid.json,401,Problem Details,auth,,
-TC05,Boundary,/readings,POST,High temperature boundary,mock-data/sensor-reading-boundary.json,201/400,documented behavior,boundary,,
+TC01,Functional,/health,GET,Service is alive,-,200,status=ok,functional,Pass,reports/newman-report-mock.xml
+TC02,Functional,/telemetry,POST,Create telemetry happy path,inline JSON,202,"has batchId, readingCount",functional,Pass,reports/newman-report-mock.xml
+TC03,Auth,/telemetry,POST,Missing token,inline JSON,401/403,Problem Details/auth,auth,Pass,reports/newman-report-mock.xml
+TC04,Auth,/telemetry,POST,Invalid token,inline JSON,401/403,Problem Details/auth,auth,Pass,reports/newman-report-mock.xml
+TC05,Negative,/telemetry,POST,Invalid payload (wrong field),inline JSON,400/422,Problem Details,negative,Pass,reports/newman-report-mock.xml
+TC06,Boundary,/telemetry,POST,High temperature boundary,inline JSON,201/400,warning or validation response,boundary,Pass,reports/newman-report-mock.xml
+TC07,Consumer_side_Smoke,/events,POST,Smoke call to dependent service,inline JSON,200/201/202,connectivity verified,smoke,Pass,reports/newman-report-mock.xml
+TC08,Local_only_NonFunctional,/health,GET,Local response time check,-,200,responseTime < 1000ms,non-functional,Pass,reports/newman-report-local.xml
